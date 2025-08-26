@@ -1,0 +1,51 @@
+topics:
+  - key: ai-consciousness-parity
+    category: Filosofis & Etika
+    title: Apakah kesadaran artificial bisa dianggap setara dengan kesadaran manusia?
+    description: Eksplorasi qualia, hard problem of consciousness, dan implikasi moral jika AI menjadi sentien.
+    tags: [kesadaran, qualia, moral, AI]
+  - key: genetic-enhancement-posthuman
+    category: Filosofis & Etika
+    title: Haruskah kita mengizinkan genetic enhancement pada manusia untuk menciptakan "post-human"?
+    description: Bioetika, kesetaraan sosial, dan definisi kemanusiaan di masa depan.
+    tags: [bioetika, kesetaraan, transhumanisme]
+  - key: total-surveillance-vs-crime
+    category: Teknologi & Sosial
+    title: Apakah surveillance state yang total bisa dibenarkan jika bisa mengeliminasi kejahatan?
+    description: Privacy vs security, potensi distopia vs utopia teknologi.
+    tags: [privasi, keamanan, pengawasan]
+  - key: ip-ownership-time-limit
+    category: Teknologi & Sosial
+    title: Haruskah ada batas waktu kepemilikan intelektual, atau knowledge harus selalu free?
+    description: Inovasi vs akses, kapitalisasi ide vs kemajuan kolektif.
+    tags: [IP, akses, inovasi]
+  - key: democracy-relevance-info-overload
+    category: Politik & Ekonomi
+    title: Apakah demokrasi masih relevan di era information overload dan manipulation?
+    description: Epistokrasi vs demokrasi, qualified voting, filter bubble.
+    tags: [demokrasi, epistokrasi, informasi]
+  - key: ubi-global-vs-work-ethic
+    category: Politik & Ekonomi
+    title: Haruskah kita menerapkan Universal Basic Income secara global atau itu akan menghancurkan work ethic?
+    description: Otomasi, martabat manusia, dan distribusi kekayaan.
+    tags: [UBI, otomasi, ekonomi]
+  - key: simulation-hypothesis-break-out
+    category: Sains & Realitas
+    title: Apakah simulasi hypothesis benar, dan jika ya, haruskah kita mencoba "break out"?
+    description: Hakikat realitas dan kewajiban moral di dalam simulasi.
+    tags: [simulasi, realitas, moral]
+  - key: terraforming-vs-alien-ecosystems
+    category: Sains & Realitas
+    title: Haruskah kita melakukan terraforming planet lain meski bisa merusak ekosistem alien yang belum kita pahami?
+    description: Ekspansi vs pelestarian, antropo-sentrisme.
+    tags: [terraforming, ekologi, etika]
+  - key: suffering-value-vs-hedonism
+    category: Eksistensial
+    title: Apakah suffering itu inherently bad, atau ada value dalam pengalaman negatif yang tidak bisa diganti?
+    description: Hedonistic calculus vs meaning through struggle.
+    tags: [penderitaan, hedonisme, makna]
+  - key: immortality-vs-natural-order
+    category: Eksistensial
+    title: Haruskah humanity berusaha mencapai immortality atau death adalah bagian essential dari human experience?
+    description: Transhumanisme vs natural order, makna dari kefanaan.
+    tags: [immortality, transhumanisme, eksistensial]

@@ -1,10 +1,9 @@
 models:
-  thinker: llama3-8b-8192
-  challenger: llama-3.1-8b-instant
-  pragmatist: gemma2-9b-it
-  empath: llama3-8b-8192
-  contrarian: qwen/qwen3-32b
+  alpha: llama-3.1-8b-instant
+  beta: llama3-8b-8192
+  gamma: gemma2-9b-it
+  delta: allam-2-7b
 
 # Note: To minimize costs further, you can map all personas to
-#   - llama3-8b-8192 or llama-3.1-8b-instant
+#   - llama-3.1-8b-instant or llama3-8b-8192
 # while keeping distinct personalities via prompts.
