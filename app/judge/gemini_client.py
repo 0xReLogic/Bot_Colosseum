@@ -18,14 +18,23 @@ class GeminiJudge:
     def _summarize_sync(self, texts: List[str], max_tokens: int) -> str:
         model = genai.GenerativeModel(self.model_name)
         prompt = (
-            "You are a succinct debate moderator (judge).\n"
-            "Summarize the last turns in 3 short bullet points, then add 1 suggestion for the next turns.\n"
-            "Be neutral, mention strongest points and missing counter-arguments.\n\n"
-            "Context:\n" + "\n---\n".join(texts[-12:])
+            "Anda adalah moderator debat yang ringkas (juri). Bahasa: Indonesia.\n"
+            "Ringkaslah giliran terakhir dalam 3 bullet poin pendek, lalu beri 1 saran untuk giliran berikutnya.\n"
+            "Bersikap netral, sebutkan poin terkuat dan kontra-argumen yang belum dijawab.\n"
+            "Jangan menulis heading seperti 'Ringkasan Juri'. Jawab hanya berupa bullet.\n\n"
+            "Konteks:\n" + "\n---\n".join(texts[-12:])
         )
         config = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.4)
         resp = model.generate_content(prompt, generation_config=config)
-        return getattr(resp, "text", "(no content)")
+        text = getattr(resp, "text", "(no content)")
+        # Optional usage logging
+        if os.getenv("LOG_TOKEN_USAGE"):
+            try:
+                usage = getattr(resp, "usage_metadata", None) or getattr(resp, "usageMetadata", None)
+                print(f"[gemini_usage] model={self.model_name} usage={getattr(usage, 'to_dict', lambda: usage)() if usage else None}")
+            except Exception:
+                pass
+        return text
 
     async def summarize(self, texts: List[str], max_tokens: int = 120) -> str:
         return await asyncio.to_thread(self._summarize_sync, texts, max_tokens)

@@ -1,0 +1,27 @@
+# VCS
+.git
+.gitignore
+.github/
+
+# Environments
+.venv/
+.env
+*.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Builds
+build/
+dist/
+node_modules/

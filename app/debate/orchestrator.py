@@ -10,6 +10,11 @@ from typing import Dict, List, Optional, Tuple
 from aiogram import Bot
 
 from app.llm.groq_client import GroqClient
+from app.db.supabase_client import (
+    create_debate_session,
+    end_debate_session,
+    insert_message,
+)
 
 
 @dataclasses.dataclass
@@ -31,6 +36,7 @@ class DebateSession:
     history: List[Tuple[str, str]] = dataclasses.field(default_factory=list)  # (speaker_key, text)
     judge_summary: Optional[str] = None
     lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
+    session_db_id: Optional[str] = None
 
 
 class DebateOrchestrator:
@@ -83,6 +89,11 @@ class DebateOrchestrator:
             personas_order=turn_order,
             active=True,
         )
+        # Create DB session (non-blocking) if DATABASE_URL configured
+        try:
+            session.session_db_id = await asyncio.to_thread(create_debate_session, chat_id, topic_title)
+        except Exception:
+            session.session_db_id = None
         self.sessions[key] = session
 
         # spawn background loop
@@ -101,6 +112,10 @@ class DebateOrchestrator:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        # End DB session if exists
+        if session.session_db_id:
+            with contextlib.suppress(Exception):
+                await asyncio.to_thread(end_debate_session, session.session_db_id)
         return True
 
     async def stop_all_sessions_for_chat(self, chat_id: int) -> int:
@@ -116,6 +131,10 @@ class DebateOrchestrator:
                     task.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await task
+                # End DB session if exists
+                if session.session_db_id:
+                    with contextlib.suppress(Exception):
+                        await asyncio.to_thread(end_debate_session, session.session_db_id)
                 count += 1
         return count
 
@@ -135,7 +154,10 @@ class DebateOrchestrator:
         # Build Chat Completions style messages
         sys = (
             speaker.system_prompt
-            + "\nGaya: ringkas, 3-5 bullet poin. Jangan terlalu panjang."
+            + "\nBahasa: Indonesia."
+            + "\nInstruksi penting: jangan menyalin atau menulis label/nama persona (mis. 'Alpha-001:', 'Beta-002:', 'Gamma-003:', 'Delta-004:') atau frasa 'Ringkasan Juri'. Mulai langsung dengan bullet poin, tanpa heading/prefiks nama."
+            + "\nGaya: ringkas, 3-5 bullet poin; kalimat pendek."
+            + "\nJika ada ringkasan juri di konteks, gunakan hanya sebagai rujukan; jangan tulis frasa 'Ringkasan Juri' di jawaban."
             + f"\nTopik: {session.topic_title}\n"
         )
         messages: List[dict] = [{"role": "system", "content": sys}]
@@ -167,18 +189,23 @@ class DebateOrchestrator:
 
             messages = self._build_messages(session, speaker)
             try:
+                stop_list = [f"{p.name}:" for p in self.persona_map.values()] + [
+                    "Ringkasan Juri:",
+                    "Ringkasan Juri",
+                ]
                 text = self.groq.chat(
                     model=speaker.model,
                     messages=messages,
                     temperature=0.6,
                     max_tokens=self.max_tokens,
+                    stop=stop_list,
                 )
             except Exception as e:  # noqa: BLE001
                 text = f"(gagal generate: {e})"
 
             # send to chat (thread if exists)
             try:
-                await bot.send_message(
+                msg = await bot.send_message(
                     chat_id=session.chat_id,
                     text=text,
                     message_thread_id=session.thread_id,
@@ -186,9 +213,21 @@ class DebateOrchestrator:
                 )
             except Exception as e:  # noqa: BLE001
                 print(f"[send_message] error: {e}")
+                msg = None
 
             session.history.append((speaker_key, text))
             session.turn_index += 1
+
+            # log to DB if configured
+            if session.session_db_id:
+                with contextlib.suppress(Exception):
+                    await asyncio.to_thread(
+                        insert_message,
+                        session.session_db_id,
+                        text,
+                        getattr(msg, "message_id", None) if msg else None,
+                        "assistant",
+                    )
 
             # judge summary cadence
             if (
@@ -215,7 +254,7 @@ class DebateOrchestrator:
 
         if self.judge_bot:
             try:
-                await self.judge_bot.send_message(
+                msg = await self.judge_bot.send_message(
                     chat_id=session.chat_id,
                     text=f"[Ringkasan Juri]\n{summary}",
                     message_thread_id=session.thread_id,
@@ -223,6 +262,18 @@ class DebateOrchestrator:
                 )
             except Exception as e:  # noqa: BLE001
                 print(f"[judge_send] error: {e}")
+                msg = None
+
+            # log judge summary to DB as system role
+            if session.session_db_id:
+                with contextlib.suppress(Exception):
+                    await asyncio.to_thread(
+                        insert_message,
+                        session.session_db_id,
+                        f"[Ringkasan Juri]\n{summary}",
+                        getattr(msg, "message_id", None) if msg else None,
+                        "system",
+                    )
 
     async def post_summary_now(self, chat_id: int, thread_id: Optional[int]) -> bool:
         """Public method to request a judge summary immediately for a session."""
