@@ -54,10 +54,15 @@ def init_db() -> int:
         print("DATABASE_URL is missing in environment.")
         return 1
 
-    migration_path = os.path.join(PROJECT_ROOT, "migrations", "001_init.sql")
+    mig_dir = os.path.join(PROJECT_ROOT, "migrations")
+    files = [f for f in os.listdir(mig_dir) if f.endswith(".sql")]
+    files.sort()  # lexicographical order: 001_*, 002_*, ...
     try:
-        apply_migration(db_url, migration_path)
-        print("Database migration applied.")
+        for f in files:
+            path = os.path.join(mig_dir, f)
+            apply_migration(db_url, path)
+            print(f"Applied migration: {f}")
+        print("All migrations applied.")
         return 0
     except Exception as e:
         print("Migration failed:", e)
@@ -102,9 +107,16 @@ async def run() -> None:
         name = p.get("name")
         sys_prompt = p.get("system_prompt", "")
         model = model_map.get(key)
+        # temperature: prefer persona config, else BOT_TEMPERATURE env, else default 0.6
+        temp_cfg = p.get("temperature")
+        temp_env = os.getenv("BOT_TEMPERATURE")
+        try:
+            temperature = float(temp_cfg) if temp_cfg is not None else (float(temp_env) if temp_env else 0.6)
+        except Exception:
+            temperature = 0.6
         if not all([key, name, sys_prompt, model]):
             continue
-        personas.append(Persona(key=key, name=name, system_prompt=sys_prompt, model=model))
+        personas.append(Persona(key=key, name=name, system_prompt=sys_prompt, model=model, temperature=temperature))
 
     if not personas:
         raise RuntimeError("No personas configured")

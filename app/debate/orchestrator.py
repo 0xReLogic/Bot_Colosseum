@@ -14,6 +14,7 @@ from app.db.supabase_client import (
     create_debate_session,
     end_debate_session,
     insert_message,
+    insert_usage,
 )
 
 
@@ -23,6 +24,7 @@ class Persona:
     name: str
     system_prompt: str
     model: str
+    temperature: float = 0.6
 
 
 @dataclasses.dataclass
@@ -156,8 +158,11 @@ class DebateOrchestrator:
             speaker.system_prompt
             + "\nBahasa: Indonesia."
             + "\nInstruksi penting: jangan menyalin atau menulis label/nama persona (mis. 'Alpha-001:', 'Beta-002:', 'Gamma-003:', 'Delta-004:') atau frasa 'Ringkasan Juri'. Mulai langsung dengan bullet poin, tanpa heading/prefiks nama."
-            + "\nGaya: ringkas, 3-5 bullet poin; kalimat pendek."
-            + "\nJika ada ringkasan juri di konteks, gunakan hanya sebagai rujukan; jangan tulis frasa 'Ringkasan Juri' di jawaban."
+            + "\nGaya: ringkas, maksimal 4 bullet dengan prefix '• '; kalimat pendek."
+            + "\nRespons: tanggapi 1–2 poin terakhir lawan secara spesifik (kutip singkat jika perlu)."
+            + "\nLarangan: jangan mengulang poin yang sudah Anda sampaikan pada giliran sebelumnya."
+            + "\nTambah: berikan minimal 1 argumen/analogi/contoh/data baru untuk maju ke depan."
+            + "\nJika ada ringkasan juri di konteks, gunakan hanya sebagai rujukan; jangan tulis frasa 'Ringkasan Juri' dan jangan mengomentari juri."
             + f"\nTopik: {session.topic_title}\n"
         )
         messages: List[dict] = [{"role": "system", "content": sys}]
@@ -188,20 +193,22 @@ class DebateOrchestrator:
                 return
 
             messages = self._build_messages(session, speaker)
+            usage = None
             try:
-                stop_list = [f"{p.name}:" for p in self.persona_map.values()] + [
-                    "Ringkasan Juri:",
-                    "Ringkasan Juri",
-                ]
-                text = self.groq.chat(
+                # OpenAI-compatible 'stop' supports up to 4 sequences. Keep persona labels only.
+                stop_list = [f"{p.name}:" for p in self.persona_map.values()][:4]
+                use_stop = os.getenv("GROQ_USE_STOP", "1") == "1"
+                text, usage = self.groq.chat(
                     model=speaker.model,
                     messages=messages,
-                    temperature=0.6,
+                    temperature=speaker.temperature,
                     max_tokens=self.max_tokens,
-                    stop=stop_list,
+                    stop=stop_list if use_stop else None,
+                    return_usage=True,
                 )
             except Exception as e:  # noqa: BLE001
                 text = f"(gagal generate: {e})"
+                usage = None
 
             # send to chat (thread if exists)
             try:
@@ -228,6 +235,20 @@ class DebateOrchestrator:
                         getattr(msg, "message_id", None) if msg else None,
                         "assistant",
                     )
+                # token usage (Groq)
+                if usage:
+                    with contextlib.suppress(Exception):
+                        await asyncio.to_thread(
+                            insert_usage,
+                            session.session_db_id,
+                            session.chat_id,
+                            session.thread_id,
+                            "groq",
+                            speaker.model,
+                            "assistant",
+                            usage,
+                            {"persona_key": speaker_key},
+                        )
 
             # judge summary cadence
             if (
@@ -246,8 +267,13 @@ class DebateOrchestrator:
 
         judge = GeminiJudge()
         recent_texts = [t for _, t in session.history[-(self.context_turns * len(session.personas_order)) :]]
+        usage = None
         try:
-            summary = await judge.summarize(recent_texts, max_tokens=self.judge_summary_max_tokens)
+            res = await judge.summarize(recent_texts, max_tokens=self.judge_summary_max_tokens, return_usage=True)
+            if isinstance(res, tuple):
+                summary, usage = res
+            else:
+                summary = res
         except Exception as e:  # noqa: BLE001
             summary = f"(Ringkasan juri gagal: {e})"
         session.judge_summary = summary
@@ -274,6 +300,19 @@ class DebateOrchestrator:
                         getattr(msg, "message_id", None) if msg else None,
                         "system",
                     )
+                if usage:
+                    with contextlib.suppress(Exception):
+                        await asyncio.to_thread(
+                            insert_usage,
+                            session.session_db_id,
+                            session.chat_id,
+                            session.thread_id,
+                            "gemini",
+                            judge.model_name,
+                            "judge",
+                            usage,
+                            None,
+                        )
 
     async def post_summary_now(self, chat_id: int, thread_id: Optional[int]) -> bool:
         """Public method to request a judge summary immediately for a session."""
