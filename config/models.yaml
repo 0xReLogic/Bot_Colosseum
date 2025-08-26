@@ -1,0 +1,10 @@
+models:
+  thinker: llama3-8b-8192
+  challenger: llama-3.1-8b-instant
+  pragmatist: gemma2-9b-it
+  empath: llama3-8b-8192
+  contrarian: qwen/qwen3-32b
+
+# Note: To minimize costs further, you can map all personas to
+#   - llama3-8b-8192 or llama-3.1-8b-instant
+# while keeping distinct personalities via prompts.
