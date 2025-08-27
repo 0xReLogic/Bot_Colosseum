@@ -14,5 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source
 COPY . .
 
+# Expose port for health checks
+EXPOSE 8000
+
 # Default: run the bot
 CMD ["python", "-m", "app.main", "run"]

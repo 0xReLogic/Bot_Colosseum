@@ -8,9 +8,11 @@ from app.db.supabase_client import apply_migration
 from app.llm.groq_client import GroqClient
 from app.debate.orchestrator import DebateOrchestrator, Persona, DailyScheduler
 from app.telegram.handlers import build_router, State
+from app.web import app as web_app, set_bot_running
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from uvicorn import Config, Server
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -172,8 +174,22 @@ async def run() -> None:
     dp = Dispatcher()
     dp.include_router(build_router(state))
 
-    print("Judge bot polling started. Use /start_debate in your supergroup.")
-    await dp.start_polling(judge_bot)
+    # Start web server for health checks
+    port = int(os.getenv("PORT", 8000))
+    config = Config(app=web_app, host="0.0.0.0", port=port, log_level="info")
+    server = Server(config=config)
+    
+    # Run both the web server and bot concurrently
+    async def run_bot():
+        print("Judge bot polling started. Use /start_debate in your supergroup.")
+        set_bot_running(True)
+        await dp.start_polling(judge_bot)
+    
+    async def run_web():
+        await server.serve()
+    
+    # Run both tasks concurrently
+    await asyncio.gather(run_web(), run_bot())
 
 
 if __name__ == "__main__":
